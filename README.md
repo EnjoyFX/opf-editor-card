@@ -45,6 +45,8 @@ Export from the command line, with the custom fonts and the deck's pictures:
 npm run export -- decks/my-talk.opf.md out/my-talk.pptx     # also .pdf, .png, or .svg (one file per slide)
 ```
 
+A Jira CSV export becomes a feature table slide (Feature · BV · Ticket · Status) with `npm run jira-csv -- features.csv`; see [docs/jira-csv.md](docs/jira-csv.md).
+
 npm 11 may print `allow-scripts ... esbuild (postinstall)`. You can ignore it: esbuild works without that script.
 
 ### Linux service (systemd example)
@@ -138,6 +140,7 @@ server/deck-api.js    HTTP API: decks, images, fonts (used by Vite dev and by se
 server/fonts.js       lists fonts/ and reads family/weight/style from each file (fontkit)
 scripts/export.js     command-line export with the custom fonts (npm run export)
 scripts/check.js      validation with the custom fonts (npm run check)
+scripts/jira-csv.js   Jira CSV export -> feature table slide (npm run jira-csv), see docs/jira-csv.md
 server/serve.js       production static server + API
 vite.config.js        dev server + build (relative base)
 decks/                your presentations and their images (git-ignored)
