@@ -1,0 +1,36 @@
+{
+  "name": "opf-editor-card",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A one-page presentation editor card: edit .opf.md/.opf.json/.opf.yaml decks, preview slides, export PowerPoint. Built on the OpenPresentation editor.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "postinstall": "opf-preview-fonts public/opf-fonts",
+    "dev": "vite",
+    "build": "vite build",
+    "start": "node server/serve.js",
+    "validate": "opf validate decks --fail-on warning"
+  },
+  "dependencies": {
+    "@expo-google-fonts/arimo": "0.4.3",
+    "@expo-google-fonts/caladea": "0.4.2",
+    "@expo-google-fonts/cousine": "0.4.3",
+    "@expo-google-fonts/gelasio": "0.4.1",
+    "@expo-google-fonts/noto-sans": "0.4.2",
+    "@expo-google-fonts/roboto": "0.4.3",
+    "@expo-google-fonts/roboto-mono": "0.4.2",
+    "@expo-google-fonts/tinos": "0.4.2",
+    "@openpresentation/gallery": "0.34.2",
+    "@openpresentation/opf": "0.34.2",
+    "@openpresentation/opf-editor": "0.34.2",
+    "@openpresentation/opf-pptx": "0.34.2",
+    "@openpresentation/opf-render": "0.34.2"
+  },
+  "devDependencies": {
+    "@openpresentation/cli": "0.34.2",
+    "vite": "7.3.8"
+  }
+}

@@ -1,0 +1,39 @@
+html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; }
+body { display: flex; flex-direction: column; }
+
+.card-bar { display: flex; gap: 12px; align-items: center; padding: 8px 12px; border-bottom: 1px solid #ddd; }
+.card-bar select, .card-bar button { font: inherit; }
+#status { color: #666; font-size: 14px; }
+#editor { flex: 1; min-height: 0; }
+
+/*
+ * Layout toggles (buttons Code / Review / Slides left in the editor toolbar).
+ * These rules target opf-editor's internal classes (checked against 0.34.2): re-check them after upgrading the package.
+ */
+#editor.hide-source .opf-ws-source,
+#editor.hide-review .opf-ws-side { display: none; }
+
+/* PowerPoint-style: the slide thumbnails in a vertical column left of the slide. */
+#editor.thumbs-left .opf-ws-main {
+  display: grid;
+  grid-template-columns: 172px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+#editor.thumbs-left .opf-ws-find,
+#editor.thumbs-left .opf-ws-stage,
+#editor.thumbs-left .opf-ws-status { grid-column: 2; }
+#editor.thumbs-left .opf-ws-find { grid-row: 1; }
+#editor.thumbs-left .opf-ws-stage { grid-row: 2; }
+#editor.thumbs-left .opf-ws-status { grid-row: 3; }
+#editor.thumbs-left .opf-ws-dock {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 8px 0;
+  border-right: 1px solid var(--opf-ui-border, #ddd);
+}
+#editor.thumbs-left .opf-ws-navigator { align-self: center; }
+#editor.thumbs-left .opf-ws-thumbnails { flex: 1; min-height: 0; width: auto; }
+#editor.thumbs-left .opf-thumbs { height: 100%; overflow-x: hidden; overflow-y: auto; }
+#editor.thumbs-left .opf-thumbs-list { flex-direction: column; align-items: center; width: auto; }

@@ -1,0 +1,8 @@
+node_modules/
+dist/
+# Copied from the font packages by `npm install` (postinstall), about 34 MB.
+public/opf-fonts/
+# Your presentations are your data: keep them out of the public repo.
+decks/*
+!decks/.gitkeep
+.DS_Store
