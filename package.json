@@ -2,6 +2,7 @@
   "name": "opf-editor-card",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "A one-page presentation editor card: edit .opf.md/.opf.json/.opf.yaml decks, preview slides, export PowerPoint. Built on the OpenPresentation editor.",
   "type": "module",
   "engines": {

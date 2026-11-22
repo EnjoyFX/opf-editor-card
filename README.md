@@ -211,3 +211,7 @@ The official agent skills for OPF can be added with `npx opf skills install --ag
 - [Design: themes, colors, fonts, backgrounds](https://github.com/OpenPresentation/opf/blob/main/docs/design-resolution.md), [images and backgrounds](https://github.com/OpenPresentation/opf/blob/main/docs/image-treatments.md), [layouts](https://github.com/OpenPresentation/opf/blob/main/docs/layout-templates.md)
 - [Validation rules](https://github.com/OpenPresentation/opf/blob/main/docs/validate.md), [CLI](https://github.com/OpenPresentation/opf/blob/main/docs/cli.md)
 - [Editor README](https://github.com/OpenPresentation/opf/blob/main/packages/editor/README.md), [embedding](https://github.com/OpenPresentation/opf/blob/main/packages/editor/docs/embedding.md), [browser editing](https://github.com/OpenPresentation/opf/blob/main/docs/live-editor.md)
+
+## License
+
+MIT, see [LICENSE](LICENSE). The OpenPresentation packages it uses are MIT-licensed too.
