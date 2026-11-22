@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
-import { handleDeckApi } from "./server/deck-api.js";
+import { handleApi } from "./server/deck-api.js";
 
 export default defineConfig({
   // Relative URLs, so the built page also works when your app serves it under a sub-path.
@@ -11,7 +11,10 @@ export default defineConfig({
     {
       name: "deck-api",
       configureServer(server) {
-        server.middlewares.use("/api/decks", (req, res) => handleDeckApi(req, res, req.url.split("?")[0]));
+        server.middlewares.use(async (req, res, next) => {
+          const pathname = req.url.split("?")[0];
+          if (!pathname.startsWith("/api/") || (await handleApi(req, res, pathname)) === false) next();
+        });
       },
     },
   ],

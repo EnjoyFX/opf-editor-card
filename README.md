@@ -16,6 +16,8 @@ A one-page presentation editor you can drop into an app as a card: open `.opf.md
 
   The toggles are remembered per browser.
 - **`?deck=<file>`** opens a given deck, so a card can link straight to one presentation.
+- **Custom fonts.** Drop `.ttf`/`.otf` files into `fonts/`. The preview, the PowerPoint export and `npm run export` all pick them up; see [Custom fonts](#custom-fonts).
+- **Pictures.** A deck can use images next to it, such as `decks/images/bg.png`, for picture backgrounds and image blocks; see [Pictures and backgrounds](#pictures-and-backgrounds).
 
 ## Requirements
 
@@ -34,7 +36,13 @@ Production (no Vite at runtime; `server/serve.js` has no dependencies):
 ```sh
 npm run build         # -> dist/
 npm start             # http://127.0.0.1:5179/
-HOST=0.0.0.0 PORT=8080 DECKS_DIR=/srv/decks npm start
+HOST=0.0.0.0 PORT=8080 DECKS_DIR=/srv/decks FONTS_DIR=/srv/fonts npm start
+```
+
+Export from the command line, with the custom fonts and the deck's pictures:
+
+```sh
+npm run export -- decks/my-talk.opf.md out/my-talk.pptx     # also .pdf, .png, or .svg (one file per slide)
 ```
 
 npm 11 may print `allow-scripts ... esbuild (postinstall)`. You can ignore it: esbuild works without that script.
@@ -49,7 +57,7 @@ After=network.target
 
 [Service]
 WorkingDirectory=/opt/opf-editor-card
-Environment=PORT=5179 HOST=127.0.0.1 DECKS_DIR=/opt/opf-editor-card/decks
+Environment=PORT=5179 HOST=127.0.0.1 DECKS_DIR=/opt/opf-editor-card/decks FONTS_DIR=/opt/opf-editor-card/fonts
 ExecStart=/usr/bin/node server/serve.js
 Restart=on-failure
 User=www-data
@@ -58,11 +66,56 @@ User=www-data
 WantedBy=multi-user.target
 ```
 
+## Custom fonts
+
+1. Put the font files into `fonts/` (or `FONTS_DIR`): one `.ttf` or `.otf` per weight and style, for example `Inter-Regular.ttf` and `Inter-Bold.ttf`. Family, weight and italic are read from the files themselves, so the file names do not matter.
+2. Name the families in the deck:
+   ```yaml
+   design:
+     fontScheme:
+       major: Montserrat   # headings
+       minor: Inter        # body text
+   ```
+3. Reload the page. The fonts are listed once, when the page loads.
+
+**Licences.** Use fonts whose licence allows embedding and redistribution: OFL, Apache-2.0 or MIT, such as Google Fonts. The preview embeds the font files in the page.
+
+**PowerPoint.** The exported `.pptx` names the font but does not include the file. Anyone who opens it without the font installed sees a substitute.
+
+**Already bundled.** Many families ship with the renderer: Roboto, Montserrat, Poppins, Open Sans, Raleway, Lora, Merriweather Sans, Playfair Display, Barlow, Figtree, Work Sans and more. A copy of one of those in `fonts/` is skipped with a warning, and the bundled face is used.
+
+## Pictures and backgrounds
+
+Put images next to the decks, for example `decks/images/bg.png`, and refer to them relative to the deck:
+
+```yaml
+design:
+  background:
+    type: image
+    src: ./images/bg.png
+    fit: cover                            # cover | contain | stretch | tile
+    overlay: { color: dark1, opacity: 0.4 } # keeps text readable
+```
+
+Other background types:
+- a colour: a scheme slot such as `dark2`, or a `#hex` value;
+- a gradient: `type: gradient` with `stops`;
+- a pattern.
+
+Any of these can be set for the whole deck (front matter) or for one slide (an `opf-slide` fence).
+
+**Image sources.** Remote `https://` images are **not** fetched: the renderer works offline by design. Use a local file or a `data:` URI.
+
+**New images.** The page loads a deck's images when the deck is opened. An image path you type later shows up after you save and reopen the deck.
+
 ## Put it in your app
 
 - **As an iframe card** (simplest): `<iframe src="http://127.0.0.1:5179/?deck=my-talk.opf.md" style="width:100%;height:100%;border:0"></iframe>`.
 - **Under a sub-path** of your app (`/presentations/`): proxy that path to this server. The page uses relative URLs only (`base: "./"`, `api/decks`, `opf-fonts/`). The page URL must end with `/`. This setup is designed for but not yet tested behind a proxy.
-- **Security:** the deck API **has no authentication** and writes files. Keep it on `127.0.0.1` behind your app, or add auth in your proxy. File names are limited to `*.opf.{md,json,yaml}` inside `DECKS_DIR` (no paths), and bodies to 10 MB.
+- **Security:** the API **has no authentication** and writes files. Keep it on `127.0.0.1` behind your app, or add auth in your proxy. Limits:
+  - deck names: `*.opf.{md,json,yaml}` inside `DECKS_DIR`, no paths;
+  - images and fonts: never resolved outside their folders;
+  - request bodies: 10 MB at most.
 
 ### HTTP API (`server/deck-api.js`)
 
@@ -71,17 +124,24 @@ WantedBy=multi-user.target
 | GET | `/api/decks` | JSON array of deck file names |
 | GET | `/api/decks/<name>` | the file's text |
 | PUT | `/api/decks/<name>` | writes the request body (creates or replaces) |
+| GET | `/api/files/<path>` | an image inside `DECKS_DIR` (png, jpg, gif, webp, svg) |
+| GET | `/api/fonts` | the custom faces: `[{ family, weight, italic, sha256, url }]` |
+| GET | `/api/fonts/<file>` | a font file from `FONTS_DIR` |
 
 ## Project layout
 
 ```
 index.html            page shell: file menu, New, status line, #editor
-src/main.js           mounts the editor per file, Save, toggles, PowerPoint export hook
+src/main.js           mounts the editor per file, Save, toggles, fonts, images, PowerPoint export hook
 src/card.css          layout toggles (CSS over the editor's internal classes)
-server/deck-api.js    deck file API (used by Vite dev and by serve.js)
+server/deck-api.js    HTTP API: decks, images, fonts (used by Vite dev and by serve.js)
+server/fonts.js       lists fonts/ and reads family/weight/style from each file (fontkit)
+scripts/export.js     command-line export with the custom fonts (npm run export)
+scripts/check.js      validation with the custom fonts (npm run check)
 server/serve.js       production static server + API
 vite.config.js        dev server + build (relative base)
-decks/                your presentations (git-ignored)
+decks/                your presentations and their images (git-ignored)
+fonts/                your custom font files (git-ignored)
 public/opf-fonts/     preview fonts, generated by npm install (git-ignored)
 ```
 
@@ -163,13 +223,21 @@ Q2,4.8
   ```
   Prefer this over `opf catalog`, which was very slow in our tests.
 
-**Workflow loop.** Do this after every edit. A deck is done when validate passes with `--fail-on warning`.
+**Workflow loop.** Do this after every edit. A deck is done when `npm run check` passes: no errors or warnings.
 
 ```sh
-npx opf validate decks/my-talk.opf.md --format text --fail-on warning
-npx opf convert decks/my-talk.opf.md /tmp/preview/slide.svg --force   # one SVG per slide; look at them
-npx opf convert decks/my-talk.opf.md /tmp/my-talk.pptx --force         # PowerPoint
+npm run check -- decks/my-talk.opf.md                              # validate, text fit measured with fonts/
+npm run export -- decks/my-talk.opf.md /tmp/preview/slide.svg      # one SVG per slide; look at them
+npm run export -- decks/my-talk.opf.md /tmp/my-talk.pptx           # PowerPoint
 ```
+
+Use these scripts, not the `opf` CLI directly, because the scripts load the files in `fonts/` with their real weights. The CLI (`@openpresentation/cli` 0.34.2) handles custom fonts badly:
+- `opf validate` has no `--fonts` option, so on a deck that uses a font from `fonts/` it can only report `opf/layout-failed`.
+- `opf convert --fonts <dir>` registers every file as weight 400, so a family with both a regular and a bold file fails with `Duplicate face`.
+
+For decks that use only bundled fonts, `npx opf validate … --fail-on warning` and `npx opf convert …` work fine.
+
+A font the deck names that is neither bundled nor in `fonts/` makes export fail with `font-unavailable`.
 
 Convert the SVGs to PNG to look at them, for example with headless Chrome: `chrome --headless=new --screenshot=out.png --window-size=1280,720 file:///tmp/preview/slide-1.svg`.
 
@@ -193,7 +261,9 @@ The official agent skills for OPF can be added with `npx opf skills install --ag
 - **Keep versions in step.** All `@openpresentation/*` packages are pinned to the same version (0.34.2) and must move together.
 - **Remount per file.** `src/main.js` creates one editor per open file (`mount`) and destroys it on file switch. This keeps undo history from crossing files and makes Save write the file that is shown. Keep that.
 - **Markdown format names.** Core `parse()` calls the format `"markdown"`, but the editor's source pane calls it `"md"`. Pass `filename` to `parse` instead of `format`.
-- **PowerPoint export.** It is not built into the editor; `export.exportPptx` in `main.js` supplies it with `toPptx` from `@openpresentation/opf-pptx`, using the same fonts handle as the preview.
+- **PowerPoint export.** It is not built into the editor; `export.exportPptx` in `main.js` supplies it with `toPptx` from `@openpresentation/opf-pptx`, using the same fonts handle as the preview and an `imageResolver` that returns the image bytes.
+- **Fonts in the browser.** `loadCardFonts()` in `main.js` repeats what `loadPreviewFonts` does and adds the faces from `/api/fonts` as `extraLazyFonts`. It does not use `loadPreviewFonts`' `registryOptions`, because that option replaces the bundled lazy faces instead of adding to them. Faces must carry explicit weights: the renderer does not read the weight from the file.
+- **Images in the browser.** The renderer draws only embedded pictures (data URIs) and never fetches, and the editor keeps slides it has already drawn: a picture that arrives later is not redrawn, even by `refresh()`. So `open()` fetches every relative image path in the deck as a data URI before it creates the editor.
 - **Toolbar action ids.** Ids in `actions` must not collide with the editor's own `data-action` values (`save`, `cancel`, `expand`, `previous`, `next`, `ignore-rule`). Using `save` here broke the Save button once.
 - **Toggle CSS.** The toggles in `src/card.css` target internal classes (`.opf-ws-source`, `.opf-ws-side`, `.opf-ws-main`, `.opf-ws-dock`, `.opf-thumbs`, `.opf-thumbs-list`): the editor has no runtime API to hide panels, and recreating it loses undo. **After upgrading `@openpresentation/opf-editor`, re-test all three toggles.**
 - **Canvas edits rewrite the source.** An edit made on the slide canvas rewrites the whole Markdown in OPF's canonical form when saved: key order changes, and unsupported parts become `opf-block` YAML. Edits typed in the source pane keep the author's text. Tell users this if they care about the file's exact layout.
@@ -201,6 +271,7 @@ The official agent skills for OPF can be added with `npx opf skills install --ag
 - **Checklist before committing:**
   - `npm run build` succeeds.
   - In `npm run dev`, these all work: open a deck, edit in the source, Save, New, the three toggles, and Export → PowerPoint.
+  - A deck with a custom font from `fonts/` and a picture background previews and exports with both.
 
 ### Links
 

@@ -4,7 +4,8 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { resolve, extname, normalize } from "node:path";
-import { handleDeckApi, DECKS_DIR } from "./deck-api.js";
+import { handleApi, DECKS_DIR } from "./deck-api.js";
+import { FONTS_DIR } from "./fonts.js";
 
 const DIST = resolve(import.meta.dirname, "..", "dist");
 const HOST = process.env.HOST ?? "127.0.0.1";
@@ -24,9 +25,7 @@ const TYPES = {
 
 createServer(async (req, res) => {
   const { pathname } = new URL(req.url, "http://localhost");
-  if (pathname === "/api/decks" || pathname.startsWith("/api/decks/")) {
-    return handleDeckApi(req, res, pathname.slice("/api/decks".length));
-  }
+  if (pathname.startsWith("/api/") && (await handleApi(req, res, pathname)) !== false) return;
   const file = resolve(DIST, "." + normalize(pathname === "/" ? "/index.html" : decodeURIComponent(pathname)));
   if (!file.startsWith(DIST)) {
     res.statusCode = 403;
@@ -40,4 +39,4 @@ createServer(async (req, res) => {
     res.statusCode = 404;
     res.end("not found");
   }
-}).listen(PORT, HOST, () => console.log(`opf-editor-card on http://${HOST}:${PORT}/ (decks: ${DECKS_DIR})`));
+}).listen(PORT, HOST, () => console.log(`opf-editor-card on http://${HOST}:${PORT}/ (decks: ${DECKS_DIR}, fonts: ${FONTS_DIR})`));

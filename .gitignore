@@ -5,4 +5,7 @@ public/opf-fonts/
 # Your presentations are your data: keep them out of the public repo.
 decks/*
 !decks/.gitkeep
+# Your font files (licenses vary): add them locally, see README.
+fonts/*
+!fonts/.gitkeep
 .DS_Store

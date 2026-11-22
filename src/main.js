@@ -1,7 +1,8 @@
 import "@openpresentation/opf-editor/styles.css";
 import { createOpfEditor } from "@openpresentation/opf-editor/workspace";
 import { gallery } from "@openpresentation/gallery";
-import { loadPreviewFonts } from "@openpresentation/opf-render/preview-fonts";
+import { loadFonts, splitStartupFaces } from "@openpresentation/opf-render/fonts-browser";
+import { previewBaseFaces } from "@openpresentation/opf-render/preview-fonts";
 import { parse } from "@openpresentation/opf";
 
 // All URLs are relative to the page, so it also works under a sub-path of your app.
@@ -24,7 +25,79 @@ const newButton = document.querySelector("#new");
 const status = document.querySelector("#status");
 const formatOf = (name) => name.match(/\.opf\.(md|json|yaml)$/)[1];
 const baseName = (name) => name.replace(/\.opf\.\w+$/, "");
-const fonts = loadPreviewFonts("opf-fonts/");
+const fonts = loadCardFonts();
+
+// The bundled preview fonts (as loadPreviewFonts sets them up) plus the custom faces the server lists from fonts/.
+// loadPreviewFonts' registryOptions would replace its own lazy faces, so the same setup is written out here.
+async function loadCardFonts() {
+  const root = new URL("opf-fonts/", location.href).href;
+  let custom = [];
+  try {
+    const res = await fetch("api/fonts");
+    if (res.ok) custom = await res.json();
+  } catch {}
+  const isStartup = (face) => face.family === "Roboto" && face.weight === 400 && !face.italic;
+  const { startup, rest } = splitStartupFaces(previewBaseFaces(), { startup: isStartup });
+  const bundled = (face) => ({ url: root + face.file, family: face.family, weight: face.weight, italic: face.italic, license: face.license, sha256: face.sha256 });
+  return loadFonts({
+    faces: startup.map(bundled),
+    substitutionPolicy: "visual",
+    fallbackFamily: "Roboto",
+    scriptBaseUrl: `${root}scripts/`,
+    lazyFontsBaseUrl: `${root}lazy/`,
+    extraLazyFonts: [...rest.map(bundled), ...custom.map((face) => ({ ...face, url: new URL(face.url, location.href).href }))],
+  });
+}
+
+// Images: a relative source in a deck (./images/bg.png) is a file next to the deck, served by /api/files.
+// The renderer only draws embedded pictures (data URIs) and never fetches, and the editor keeps slides it has drawn,
+// so every image a deck names is fetched as a data URI before its editor is created (see open()).
+const IMAGE_FILE = /\.(png|jpe?g|gif|webp|svg)$/i;
+const isRelative = (src) => typeof src === "string" && src !== "" && !/^(data:|https?:|blob:|asset:|var:)/i.test(src);
+const fileUrl = (src) => `api/files/${src.replace(/^\.\//, "").split("/").map(encodeURIComponent).join("/")}`;
+const images = new Map(); // src -> data URI
+
+async function loadImage(src) {
+  if (images.has(src)) return;
+  const res = await fetch(fileUrl(src));
+  if (!res.ok) throw new Error(`image ${src}: ${await res.text()}`);
+  const blob = await res.blob();
+  images.set(src, await new Promise((done) => {
+    const reader = new FileReader();
+    reader.onload = () => done(reader.result);
+    reader.readAsDataURL(blob);
+  }));
+}
+// Every relative image path in the deck (backgrounds, image blocks, assets…).
+function imagePaths(value, found = new Set()) {
+  if (typeof value === "string") {
+    if (isRelative(value) && IMAGE_FILE.test(value)) found.add(value);
+  } else if (value && typeof value === "object") {
+    for (const item of Object.values(value)) imagePaths(item, found);
+  }
+  return found;
+}
+async function preloadImages(document) {
+  const failed = [];
+  await Promise.all([...imagePaths(document)].map((src) => loadImage(src).catch((error) => failed.push(error.message))));
+  return failed;
+}
+function previewImage(src) {
+  if (!isRelative(src)) return src;
+  if (images.has(src)) return images.get(src);
+  // A path typed after the deck was opened: fetch it, then reopen the deck so it is drawn (see the README).
+  loadImage(src).then(
+    () => (status.textContent = `${src} loaded: save and reopen the deck to see it`),
+    (error) => (status.textContent = `Image not found: ${error.message}`),
+  );
+  return src;
+}
+async function exportImage(src) {
+  if (!isRelative(src)) return src;
+  const res = await fetch(fileUrl(src));
+  if (!res.ok) throw new Error(`Image ${src}: ${await res.text()}`);
+  return { data: new Uint8Array(await res.arrayBuffer()), mediaType: res.headers.get("Content-Type") ?? undefined };
+}
 
 // ---- Layout toggles. Hidden with CSS rather than a remount, so undo history and the open slide survive.
 const shown = { source: true, review: true, thumbsLeft: false };
@@ -74,6 +147,7 @@ function mount(name, text) {
     document,
     catalogs: [gallery],
     fonts,
+    imageResolver: previewImage,
     layout: "full",
     source: { format: formatOf(name), text, name: baseName(name) },
     // PowerPoint export is not built into the editor: the host supplies it.
@@ -82,7 +156,7 @@ function mount(name, text) {
         const { toPptx } = await import("@openpresentation/opf-pptx");
         const handle = await fonts;
         await handle.ensure?.(deck);
-        return toPptx(deck, { catalogs: [gallery], fonts: handle, pictureLuminance });
+        return toPptx(deck, { catalogs: [gallery], fonts: handle, pictureLuminance, imageResolver: exportImage });
       },
     },
     actions: [
@@ -151,9 +225,11 @@ async function open(name, text) {
   status.textContent = `Opening ${name}…`;
   try {
     text ??= await readDeck(name);
+    const missing = await preloadImages(parse(text, { filename: name, catalogs: [gallery] }));
     editor?.destroy();
     current = name;
     editor = mount(name, text);
+    if (missing.length) editor.on("ready", () => (status.textContent = `Missing ${missing.join("; ")}`));
     window.opfEditor = editor;
     const url = new URL(location.href);
     url.searchParams.set("deck", name);

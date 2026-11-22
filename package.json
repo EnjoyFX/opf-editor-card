@@ -13,7 +13,9 @@
     "dev": "vite",
     "build": "vite build",
     "start": "node server/serve.js",
-    "validate": "opf validate decks --fail-on warning"
+    "validate": "opf validate decks --fail-on warning",
+    "export": "node scripts/export.js",
+    "check": "node scripts/check.js"
   },
   "dependencies": {
     "@expo-google-fonts/arimo": "0.4.3",
@@ -28,7 +30,8 @@
     "@openpresentation/opf": "0.34.2",
     "@openpresentation/opf-editor": "0.34.2",
     "@openpresentation/opf-pptx": "0.34.2",
-    "@openpresentation/opf-render": "0.34.2"
+    "@openpresentation/opf-render": "0.34.2",
+    "fontkit": "3.0.0"
   },
   "devDependencies": {
     "@openpresentation/cli": "0.34.2",
