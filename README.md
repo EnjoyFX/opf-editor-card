@@ -47,6 +47,18 @@ npm run export -- decks/my-talk.opf.md out/my-talk.pptx     # also .pdf, .png, o
 
 A Jira CSV export becomes a feature table slide (Feature · BV · Ticket · Status) with `npm run jira-csv -- features.csv`; see [docs/jira-csv.md](docs/jira-csv.md).
 
+Change one slide of a Markdown deck by its `id` and leave the rest of the file as it is:
+
+```sh
+npm run slide -- list   decks/my-talk.opf.md                     # number, id and title of each slide
+npm run slide -- get    decks/my-talk.opf.md kpis kpis.md        # one slide to a file (no file: print it)
+npm run slide -- set    decks/my-talk.opf.md kpis.md             # replace the slide with the same id, or add it
+npm run slide -- set    decks/my-talk.opf.md new.md --after kpis # add after (or --before) another slide
+npm run slide -- remove decks/my-talk.opf.md kpis
+```
+
+`set` and `remove` validate the new deck first and write nothing when it would have an error. A slide file holds one slide with no front matter; its id comes from its `<!-- slide: id=… -->` comment or from `--id`. OPF Markdown has no include of other files, so a slide kept in its own file is put into the deck with `set`.
+
 npm 11 may print `allow-scripts ... esbuild (postinstall)`. You can ignore it: esbuild works without that script.
 
 ### Linux service (systemd example)
@@ -141,6 +153,7 @@ server/fonts.js       lists fonts/ and reads family/weight/style from each file 
 scripts/export.js     command-line export with the custom fonts (npm run export)
 scripts/check.js      validation with the custom fonts (npm run check)
 scripts/jira-csv.js   Jira CSV export -> feature table slide (npm run jira-csv), see docs/jira-csv.md
+scripts/slide.js      list, get, set or remove one slide by id (npm run slide); scripts/slides.js does the work
 server/serve.js       production static server + API
 vite.config.js        dev server + build (relative base)
 decks/                your presentations and their images (git-ignored)

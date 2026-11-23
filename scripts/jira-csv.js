@@ -2,17 +2,18 @@
 // for higher business value, ticket keys linked to Jira.
 //   npm run jira-csv -- epics.csv [objectives.csv …] [--out decks/release-bv.opf.md] [--base https://acme.atlassian.net]
 //                                  [--title "…"] [--bv-column "Business Value"]
+//   npm run jira-csv -- epics.csv … --into decks/my-talk.opf.md [--slide features] [--after <id> | --before <id>]
 // A feature is an epic; its BV is the epic's own BV or, when it has none, the BV of its parent issue (the Objective).
 // Give the epics and their Objectives in one CSV or in several. Columns are found by their Jira header names: Summary,
 // Issue key, Issue id, Issue Type, Status, Parent (or Parent Link), and a BV column whose header contains
 // "Business Value" (or is exactly "BV"). JIRA_BASE_URL works instead of --base. Done rows come first, in CSV order;
-// the rest follow them. The deck is then validated, as with `npm run check`.
-import { validate, parse } from "@openpresentation/opf";
-import { gallery } from "@openpresentation/gallery";
+// the rest follow them. --into puts the table slide (id "features", or --slide) into an existing Markdown deck instead,
+// replacing the slide with that id and leaving the rest of the file as it is. The deck is validated, as with
+// `npm run check`; with --into nothing is written when the deck would have an error.
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { loadNodeFonts } from "./node-fonts.js";
 import { DECKS_DIR } from "../server/deck-api.js";
+import { setSlide, checkDeck, formatFinding } from "./slides.js";
 
 const DONE = new Set(["done", "closed", "resolved", "released", "complete", "completed"]);
 const LIGHT = [0xdc, 0xe8, 0xff]; // lowest BV
@@ -26,13 +27,17 @@ const option = (name) => {
   args.splice(i, 2);
   return value;
 };
-const out = resolve(option("--out") ?? resolve(DECKS_DIR, "release-bv.opf.md"));
+const into = option("--into");
+const slideId = option("--slide") ?? "features";
+const after = option("--after");
+const before = option("--before");
+const out = resolve(into ?? option("--out") ?? resolve(DECKS_DIR, "release-bv.opf.md"));
 const base = (option("--base") ?? process.env.JIRA_BASE_URL ?? "").replace(/\/+$/, "");
 const title = option("--title");
 const bvColumn = option("--bv-column");
 const inputs = args;
 if (!inputs.length) {
-  console.error("Usage: npm run jira-csv -- epics.csv [objectives.csv …] [--out decks/x.opf.md] [--base https://acme.atlassian.net] [--title …] [--bv-column …]");
+  console.error("Usage: npm run jira-csv -- epics.csv [objectives.csv …] [--out decks/x.opf.md | --into decks/x.opf.md [--slide id]] [--base https://acme.atlassian.net] [--title …] [--bv-column …]");
   process.exit(2);
 }
 
@@ -145,7 +150,31 @@ const rows = items.map((i) => {
   return `    - ${q([i.feature, bv, ticket, status])}`;
 });
 const today = new Date().toLocaleDateString("sv"); // local YYYY-MM-DD
-const deck = `---
+const slide = `<!-- slide: id=${slideId} layout=table -->
+# ${heading}
+
+\`\`\`opf-block
+table:
+  columns: ${q(header4)}
+  rows:
+${rows.join("\n")}
+caption: ${q(`Darker blue means higher business value (BV). Source: Jira export, ${today}.`)}
+\`\`\``;
+
+let deck, action = "written";
+if (into) {
+  if (!/\.opf\.md$/.test(out)) {
+    console.error(`${out}: --into needs a Markdown deck (*.opf.md)`);
+    process.exit(1);
+  }
+  try {
+    ({ text: deck, action } = setSlide(await readFile(out, "utf8"), slide, { after, before }));
+  } catch (error) {
+    console.error(`${out}: ${error.message}`);
+    process.exit(1);
+  }
+} else {
+  deck = `---
 name: ${q(heading)}
 language: en-US
 design:
@@ -157,23 +186,16 @@ design:
   background: light1
 ---
 
-<!-- slide: id=features layout=table -->
-# ${heading}
-
-\`\`\`opf-block
-table:
-  columns: ${q(header4)}
-  rows:
-${rows.join("\n")}
-caption: ${q(`Darker blue means higher business value (BV). Source: Jira export, ${today}.`)}
-\`\`\`
+${slide}
 `;
+}
+const findings = await checkDeck(deck, out);
+for (const f of findings) console.log(formatFinding(f));
+if (into && findings.some((f) => f.severity === "error")) {
+  console.error(`${out}: not written: the deck would have an error.`);
+  process.exit(1);
+}
 await writeFile(out, deck);
-console.log(`${out}: ${items.length} features, ${open.length} not done, BV ${bvText(min)}–${bvText(max)}${base ? "" : " (no --base: tickets are not linked)"}`);
+console.log(`${out}: ${into ? `slide "${slideId}" ${action}, ` : ""}${items.length} features, ${open.length} not done, BV ${bvText(min)}–${bvText(max)}${base ? "" : " (no --base: tickets are not linked)"}`);
 if (items.length > 12) console.log("  More than 12 rows: the table text shrinks; consider splitting the slide.");
-
-const { fonts } = await loadNodeFonts();
-const report = validate(parse(deck, { filename: out, catalogs: [gallery] }), { catalogs: [gallery], fonts });
-const shown = report.findings.filter((f) => f.severity !== "info");
-for (const f of shown) console.log(`  ${f.severity.padEnd(7)} ${f.ruleId}  ${f.path ?? ""}  ${f.message}`);
-process.exit(shown.length ? 1 : 0);
+process.exit(findings.length ? 1 : 0);

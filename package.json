@@ -16,7 +16,8 @@
     "validate": "opf validate decks --fail-on warning",
     "export": "node scripts/export.js",
     "check": "node scripts/check.js",
-    "jira-csv": "node scripts/jira-csv.js"
+    "jira-csv": "node scripts/jira-csv.js",
+    "slide": "node scripts/slide.js"
   },
   "dependencies": {
     "@expo-google-fonts/arimo": "0.4.3",

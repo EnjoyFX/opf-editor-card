@@ -51,12 +51,15 @@ If an epic gets no BV, the script names it and prints `issue in (…)` with the 
 npm run jira-csv -- ~/Downloads/features.csv --base https://<site>.atlassian.net
 ```
 
-The script writes `decks/release-bv.opf.md` and validates it, as `npm run check` does. A running server shows the new deck at `?deck=release-bv.opf.md` after a page reload.
+The script writes `decks/release-bv.opf.md` and validates it, as `npm run check` does. To refresh only the table inside a bigger deck, use `--into` (below). A running server shows the new deck at `?deck=release-bv.opf.md` after a page reload.
 
 | Option | Effect |
 | --- | --- |
 | `--base <url>` or env `JIRA_BASE_URL` | Links each key to `<url>/browse/<key>`. Without it the keys are plain text. |
 | `--out decks/<name>.opf.md` | Writes another file. The default overwrites `decks/release-bv.opf.md`. |
+| `--into decks/<name>.opf.md` | Puts the table slide into an existing Markdown deck instead: it replaces the slide with id `features`, or adds it at the end. The rest of the deck is not touched, and nothing is written when the deck would have an error. |
+| `--slide <id>` | With `--into`: the slide's id (default `features`). |
+| `--after <id>`, `--before <id>` | With `--into`: where a new slide goes. |
 | `--title "…"` | Replaces the generated title. |
 | `--bv-column "<name>"` | Names the BV column. |
 
